@@ -8,8 +8,8 @@ import random
 
 class TestDataset(Dataset):
         def __init__(self):
-                print(dataid)
-                directory = "/home-local/Aim2/DATA//"
+                #print(dataid)
+                directory = "/home-local/Aim2/DATA/TRAIN/" # NOTE: Will have to change this @Gaurav
 
                 subj_list = glob.glob(directory + "*")
                 #print(subj_list)

@@ -12,7 +12,7 @@ import sys
 
 from torch.utils.data import Dataset, DataLoader,TensorDataset,random_split,SubsetRandomSampler, ConcatDataset
 from sklearn.model_selection import KFold
-from Architecture import AE, Conditional_VAE
+from Architecture import Conditional_VAE
 import losses
 from sklearn.feature_selection import mutual_info_regression
 from torch.utils.tensorboard import SummaryWriter
