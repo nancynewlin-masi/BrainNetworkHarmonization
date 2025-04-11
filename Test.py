@@ -77,7 +77,7 @@ ageerrors = np.zeros((len(test_loader),1))
 filenames = []
 seed_value = 42
 
-model = Conditional_VAE(in_dim=CONNECTOME_SIZE,c_dim=100, z_dim=100, num_measures=12).to(DEVICE)
+model = Conditional_VAE(in_dim=CONNECTOME_SIZE,c_dim=100, z_dim=100, num_measures=12).to(DEVICE) #  must be the same as the training model
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 PATH=sys.argv[1]
 model.load_state_dict(torch.load(PATH))
