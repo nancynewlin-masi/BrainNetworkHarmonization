@@ -32,20 +32,19 @@ torch.manual_seed(SEED)
 torch.backends.cudnn.benchmark = False
 torch.backends.cudnn.deterministic = True
 
+# Pass in an ID to make specific tensorboard folder
 experimentnote = sys.argv[1]
 
 # Set up Tensorboard log
 tensorboard_dir = f'Tensorboard_{experimentnote}'
 writer = SummaryWriter(tensorboard_dir)
 
-
-
 # Hyperparameters
 beta         =     1
 age_coeff    =     100
-cnm_coeff    =     10 #cnm
-recon_coeff  =     10 # recon
-sex_coeff    =     10  #sex loss
+cnm_coeff    =     10  # cnm
+recon_coeff  =     10  # recon
+sex_coeff    =     10  # sex loss
 kl_coeff     =     100 # klloss
 dx_coeff     =     100
 batch_size = 100       
@@ -104,6 +103,7 @@ for iteration in np.arange(1,2):
     class_counts = torch.bincount(torch.tensor(groups,dtype=torch.int64))
     class_weights = 1.0 / class_counts.float()
     sample_weights = class_weights[groups]
+    
     # Create a sampler
     weighted_sampler = WeightedRandomSampler(weights=sample_weights, num_samples=len(train_dataset), replacement=True)
 
@@ -113,6 +113,7 @@ for iteration in np.arange(1,2):
     # create a model from Arch (conditional variational autoencoder)
     # load it to the specified device, either gpu or cpu
     model = Conditional_VAE(in_dim=CONNECTOME_SIZE,c_dim=100, z_dim=100, num_measures=12).to(DEVICE)
+    
     # if you are setting a path to a pretrained model/want to continue training on a model, import it here!
     #PATH='/home-local/Aim2/WEIGHTS/Model_EPOCH500_NEWARCH.pt'
     #model.load_state_dict(torch.load(PATH))
@@ -148,9 +149,7 @@ for iteration in np.arange(1,2):
             batch_sitelabels        = batch_sitelabels.view(-1,100).to(DEVICE) # 1 site label per scan
             makepositive            = torch.zeros_like(batch_predictionlabels)
             makepositive[:,2]       = 1
-            batch_predictionlabels  = normalize_cnms.view(-1,12) * (batch_predictionlabels + makepositive)
-
-
+            batch_predictionlabels  = normalize_cnms.view(-1,12) * (batch_predictionlabels + makepositive) # make all values normalized between 0 and 1 (for model learning)
             batch_predictionlabels  = batch_predictionlabels[:,measures_on==1].to(DEVICE)
             batch_agelabels         = batch_agelabels.view(-1,1).to(DEVICE)
             batch_sexlabels         = batch_sexlabels.view(-1,2).to(DEVICE)
@@ -160,7 +159,6 @@ for iteration in np.arange(1,2):
             optimizer.zero_grad()
 
             # Put data through forward pass
-            #x_hat, z, z_mu, z_log_sigma_sq, model_predictions_site1, model_predictions_site2, model_predictions_age, model_predictions_sex = model.forward_train(batch_features,batch_sitelabels)
             x_hat, z, z_mu, z_log_sigma_sq, model_predictions, model_predictions_age, model_predictions_sex, model_predictions_dx = model.forward_train(batch_features,batch_sitelabels)
 
             # Reconstruction and KL divergence loss terms
@@ -169,12 +167,14 @@ for iteration in np.arange(1,2):
             sex_error = criterion_CE(model_predictions_sex, batch_sexlabels)
             dx_error = dx_criterion(model_predictions_dx, batch_dxlabels) #batch_dxlabels.type(torch.LongTensor).to(DEVICE))
 
+            # calculate sex classification accuracy
             sex_predictions = torch.nn.functional.sigmoid(model_predictions_sex)
             _,sex_predictions = torch.max(sex_predictions, 1)
             _,sex_labels = torch.max(batch_sexlabels, 1)
             sex_accuracy = (sex_predictions == sex_labels).float().mean()
             training_loss_sexacc = sex_accuracy
 
+            # compute training loss for sex classification
             train_sex = torch.sum(sex_labels) / len(sex_labels)
 
             # Weight KL loss with beta, set parameter at top
@@ -238,10 +238,12 @@ for iteration in np.arange(1,2):
         writer.add_scalars('Dx Loss',   {'Train{}'.format(iteration): training_loss_dx}, epoch)
         writer.add_scalars('GM Prediction',   {'Train{}'.format(iteration): training_loss_prediction}, epoch)
 
+        # Save the weights
         if epoch % 100 == 0:
-            PATH = f'/home-local/Aim2/WEIGHTS/MODEL_epoch_{epoch}_iteration_{iteration}_{experimentnote}.pt'
+            PATH = f'./MODEL_epoch_{epoch}_iteration_{iteration}_{experimentnote}.pt'  # NOTE: @gaurav change this to your path
             torch.save(model.state_dict(), PATH)
 
+        # Evaluate every 5 epochs
         if epoch % 5 == 0:
 
             validation_loss_prediction_site1 = 0
@@ -311,6 +313,7 @@ for iteration in np.arange(1,2):
             val_loss_prediction = cnm_coeff * torch.sum(val_loss_prediction) / len(validation_loader)  # sum across all sites, normalized by how many s>
             val_loss_total     = val_loss_age + val_loss_sex + val_loss_reconstruction + val_loss_kldivergence + val_loss_prediction + val_loss_dx
 
+            # Write to tensorboard
             writer.add_scalars('Total Loss',   {'Val{}'.format(iteration): val_loss_total}, epoch)
             writer.add_scalars('Reconstruction Loss',   {'Val{}'.format(iteration): val_loss_reconstruction}, epoch)
             writer.add_scalars('KL Loss',   {'Val{}'.format(iteration): val_loss_kldivergence}, epoch)
@@ -321,7 +324,7 @@ for iteration in np.arange(1,2):
             writer.add_scalars('Sex Loss',   {'Val{}'.format(iteration): val_loss_sex}, epoch)
 
 
-
+    # Save model weights at the last epoch
     PATH = f'./Model_{iteration}_allsites_end_epoch_{epoch}_{experimentnote}.pt'
 
     experiment = ''.join(str(x) for x in measures_on)
