@@ -8,9 +8,9 @@ import random
 
 class TrainingDataset(Dataset):
         def __init__(self):
-                directory = "/home-local/Aim2/DATA//TRAIN/"
+                directory = "/home-local/Aim2/DATA//TRAIN/" # NOTE: Will have to change this @Gaurav
                 subj_list = glob.glob(directory + "*")
-                #print(subj_list)
+                
                 self.data = []
                 for subject_path in subj_list:
                         subject = subject_path.split("/")[-1]
@@ -24,7 +24,7 @@ class TrainingDataset(Dataset):
 
                         self.data.append([img_path, label_path, site_path, age_path, sex_path, group_path,dx_path])
 
-                self.img_dim = (121, 121)
+                self.img_dim = (121, 121) # NOTE: Dimensions for SLANT, change if you only want the upper triangle
 
 
         def __len__(self):
@@ -32,50 +32,40 @@ class TrainingDataset(Dataset):
 
         def __getitem__(self, idx):
                 img_path, label_path, site_path, age_path, sex_path, group_path, dx_path = self.data[idx]
-                #print(img_path)
-                #img = pd.read_csv(img_path[0], sep=',', header=None)
-                #img = img.to_numpy(img_path[0])
-                img = np.load(img_path[0])
-                #print(img)
+                img = np.load(img_path[0]) # Get the string
 
-                img = img/100000 # divide by max? future thought
-                #np.fill_diagonal(img, 0)
+                img = img/100000 # NOTE: log norm? divide by max? future thought
+                #np.fill_diagonal(img, 0) # NOTE: Might also want to experiment with this
                 img = np.float32(img)
-
-
+                
                 label = pd.read_json(label_path[0])
                 label = label.to_numpy()
-                #print("GMs:", label)
 
                 siteid = pd.read_csv(site_path[0], sep=',', header=None)
-                #siteid = site.to_numpy()
-                #siteid = np.float32(site)
+
                 site = np.zeros(100)
-                site[siteid]=1
-                #print("Site:",site)
+                site[siteid]=1 # one hot encode
+
 
                 age = pd.read_csv(age_path[0], sep=',', header=None)
                 age = age.to_numpy()
                 age = np.float32(age)
-                #print("Age:", age)
+
 
                 sex = pd.read_csv(sex_path[0], sep=',', header=None)
                 sex = sex.to_numpy()
                 sex = np.int32(sex)
-                #sex=sex-1
+
                 sex_onehot = np.eye(2)[sex - 1]
                 sex_onehot = np.float32(sex_onehot)
 
                 dx = pd.read_csv(dx_path[0], sep=',', header=None)
-                dx = (np.float32(dx)-np.ones(dx.shape,dtype="float32")) / 2*np.ones(dx.shape,dtype="float32")
+                dx = (np.float32(dx)-np.ones(dx.shape,dtype="float32")) / 2*np.ones(dx.shape,dtype="float32") # diagnosis is either 0, 0.5, or 1
 
-                #dx = np.eye(3)[dx-1]
-
-
+                # groups are used in stratified sampling during training. They are based off the site and diagonsis to make sure we have representatives from each site and diagnosis pair
                 group = pd.read_csv(group_path[0],sep=',', header=None)
                 group = np.int32(group)
-                #print("Sex:",sex_onehot)
-                #print(sex[0:5], sex_onehot[0:5,:])
+
 
                 img_tensor = torch.from_numpy(img)
                 site_tensor = torch.tensor(site)
@@ -83,7 +73,6 @@ class TrainingDataset(Dataset):
                 sex_tensor = torch.tensor(sex)
                 sex_tensor = torch.tensor(sex_onehot)
                 dx_tensor = torch.tensor(dx)
-
 
                 return img_tensor, label, site_tensor, age_tensor, sex_tensor, group, dx_tensor, img_path
 
