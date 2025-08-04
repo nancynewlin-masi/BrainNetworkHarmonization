@@ -11,3 +11,6 @@ The architecture follows this schematic:
 
 Here is an example figure showing the clustering based on site and diagnosis in uncorrected (left) and corrected (right) connectome features. 
 ![Clusters](Figures/PCA.png "Clusters based on site and diagnosis.")
+
+### GPU specifications
+We trained this model with Quadro RTX 5000 and 16GB RAM with PyTorch version 0.4.1.
